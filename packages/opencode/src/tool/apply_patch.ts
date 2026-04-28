@@ -197,7 +197,7 @@ export const ApplyPatchTool = Tool.define(
 
       // Check permissions if needed
       const relativePaths = fileChanges.map((c) => path.relative(Instance.worktree, c.filePath).replaceAll("\\", "/"))
-      yield* ctx.ask({
+      const reply = yield* ctx.ask({
         permission: "edit",
         patterns: relativePaths,
         always: ["*"],
@@ -207,6 +207,30 @@ export const ApplyPatchTool = Tool.define(
           files,
         },
       })
+
+      const summaryLines = fileChanges.map((change) => {
+        if (change.type === "add") {
+          return `A ${path.relative(Instance.worktree, change.filePath).replaceAll("\\", "/")}`
+        }
+        if (change.type === "delete") {
+          return `D ${path.relative(Instance.worktree, change.filePath).replaceAll("\\", "/")}`
+        }
+        const target = change.movePath ?? change.filePath
+        return `M ${path.relative(Instance.worktree, target).replaceAll("\\", "/")}`
+      })
+
+      if (reply === "manual_apply") {
+        const output = `Patch was marked as manually applied in external editor.\n${summaryLines.join("\n")}`
+        return {
+          title: output,
+          metadata: {
+            diff: totalDiff,
+            files,
+            diagnostics: {},
+          },
+          output,
+        }
+      }
 
       // Apply the changes
       const updates: Array<{ file: string; event: "add" | "change" | "unlink" }> = []
@@ -265,16 +289,6 @@ export const ApplyPatchTool = Tool.define(
       const diagnostics = yield* lsp.diagnostics()
 
       // Generate output summary
-      const summaryLines = fileChanges.map((change) => {
-        if (change.type === "add") {
-          return `A ${path.relative(Instance.worktree, change.filePath).replaceAll("\\", "/")}`
-        }
-        if (change.type === "delete") {
-          return `D ${path.relative(Instance.worktree, change.filePath).replaceAll("\\", "/")}`
-        }
-        const target = change.movePath ?? change.filePath
-        return `M ${path.relative(Instance.worktree, target).replaceAll("\\", "/")}`
-      })
       let output = `Success. Updated the following files:\n${summaryLines.join("\n")}`
 
       for (const change of fileChanges) {

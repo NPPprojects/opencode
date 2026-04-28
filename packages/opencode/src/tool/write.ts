@@ -50,7 +50,7 @@ export const WriteTool = Tool.define(
           const contentNew = next.text
 
           const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, contentNew))
-          yield* ctx.ask({
+          const reply = yield* ctx.ask({
             permission: "edit",
             patterns: [path.relative(Instance.worktree, filepath)],
             always: ["*"],
@@ -59,18 +59,23 @@ export const WriteTool = Tool.define(
               diff,
             },
           })
+          const manuallyApplied = reply === "manual_apply"
 
-          yield* fs.writeWithDirs(filepath, Bom.join(contentNew, desiredBom))
-          if (yield* format.file(filepath)) {
-            yield* Bom.syncFile(fs, filepath, desiredBom)
+          if (!manuallyApplied) {
+            yield* fs.writeWithDirs(filepath, Bom.join(contentNew, desiredBom))
+            if (yield* format.file(filepath)) {
+              yield* Bom.syncFile(fs, filepath, desiredBom)
+            }
+            yield* bus.publish(File.Event.Edited, { file: filepath })
+            yield* bus.publish(FileWatcher.Event.Updated, {
+              file: filepath,
+              event: exists ? "change" : "add",
+            })
           }
-          yield* bus.publish(File.Event.Edited, { file: filepath })
-          yield* bus.publish(FileWatcher.Event.Updated, {
-            file: filepath,
-            event: exists ? "change" : "add",
-          })
 
-          let output = "Wrote file successfully."
+          let output = manuallyApplied
+            ? "Write was marked as manually applied in external editor."
+            : "Wrote file successfully."
           yield* lsp.touchFile(filepath, "document")
           const diagnostics = yield* lsp.diagnostics()
           const normalizedFilepath = AppFileSystem.normalizePath(filepath)
