@@ -4251,7 +4251,7 @@ export type SessionUnrevertResponse = SessionUnrevertResponses[keyof SessionUnre
 
 export type PermissionRespondData = {
   body?: {
-    response: "once" | "always" | "reject" | "manual_apply"
+    response: "once" | "always" | "reject"
   }
   path: {
     sessionID: string
@@ -4286,44 +4286,7 @@ export type PermissionRespondResponses = {
 
 export type PermissionRespondResponse = PermissionRespondResponses[keyof PermissionRespondResponses]
 
-export type PermissionReplyData = {
-  body?: {
-    reply: "once" | "always" | "reject" | "manual_apply"
-    message?: string
-  }
-  path: {
-    requestID: string
-  }
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/permission/{requestID}/reply"
-}
-
-export type PermissionReplyErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-  /**
-   * Not found
-   */
-  404: NotFoundError
-}
-
-export type PermissionReplyError = PermissionReplyErrors[keyof PermissionReplyErrors]
-
-export type PermissionReplyResponses = {
-  /**
-   * Permission processed successfully
-   */
-  200: boolean
-}
-
-export type PermissionReplyResponse = PermissionReplyResponses[keyof PermissionReplyResponses]
-
-export type PermissionListData = {
+export type PartDeleteData = {
   body?: never
   path?: never
   query?: {

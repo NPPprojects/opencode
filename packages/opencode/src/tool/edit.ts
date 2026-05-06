@@ -13,7 +13,7 @@ import { File } from "../file"
 import { FileWatcher } from "../file/watcher"
 import { Bus } from "../bus"
 import { Format } from "../format"
-import { Instance } from "../project/instance"
+import { InstanceState } from "@/effect/instance-state"
 import { Snapshot } from "@/snapshot"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { AppFileSystem } from "@opencode-ai/core/filesystem"
@@ -76,9 +76,10 @@ export const EditTool = Tool.define(
             throw new Error("No changes to apply: oldString and newString are identical.")
           }
 
+          const instance = yield* InstanceState.context
           const filePath = path.isAbsolute(params.filePath)
             ? params.filePath
-            : path.join(Instance.directory, params.filePath)
+            : path.join(instance.directory, params.filePath)
           yield* assertExternalDirectoryEffect(ctx, filePath)
 
           let diff = ""
@@ -97,7 +98,7 @@ export const EditTool = Tool.define(
                 diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
                 const reply = yield* ctx.ask({
                   permission: "edit",
-                  patterns: [path.relative(Instance.worktree, filePath)],
+                  patterns: [path.relative(instance.worktree, filePath)],
                   always: ["*"],
                   metadata: {
                     filepath: filePath,
@@ -144,7 +145,7 @@ export const EditTool = Tool.define(
               )
               const reply = yield* ctx.ask({
                 permission: "edit",
-                patterns: [path.relative(Instance.worktree, filePath)],
+                patterns: [path.relative(instance.worktree, filePath)],
                 always: ["*"],
                 metadata: {
                   filepath: filePath,
@@ -212,7 +213,7 @@ export const EditTool = Tool.define(
               diff,
               filediff,
             },
-            title: `${path.relative(Instance.worktree, filePath)}`,
+            title: `${path.relative(instance.worktree, filePath)}`,
             output,
           }
         }),
