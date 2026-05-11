@@ -1,5 +1,5 @@
 import { createStore } from "solid-js/store"
-import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js"
+import { createMemo, For, Match, Show, Switch } from "solid-js"
 import { Portal, useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
 import type { TextareaRenderable } from "@opentui/core"
 import { useTheme, selectedForeground } from "../../context/theme"
@@ -18,6 +18,8 @@ import { getScrollAcceleration } from "../../util/scroll"
 import { useTuiConfig } from "../../context/tui-config"
 import { useBindings, useCommandShortcut } from "../../keymap"
 import { usePathFormatter } from "../../context/path-format"
+import { useToast } from "../../ui/toast"
+import { canOpenManualApply, openManualApply } from "../../util/manual-apply"
 
 type PermissionStage = "permission" | "always" | "reject"
 
@@ -116,6 +118,8 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
   const sdk = useSDK()
   const project = useProject()
   const sync = useSync()
+  const renderer = useRenderer()
+  const toast = useToast()
   const [store, setStore] = createStore({
     stage: "permission" as PermissionStage,
   })
@@ -136,6 +140,7 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
   })
 
   const { theme } = useTheme()
+  const canManualApply = createMemo(() => props.request.permission === "edit" && canOpenManualApply(props.request))
 
   return (
     <Switch>
@@ -406,10 +411,44 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
               title="Permission required"
               header={header()}
               body={current.body}
-              options={{ once: "Allow once", always: "Allow always", reject: "Reject" }}
+              options={
+                canManualApply()
+                  ? { once: "Allow once", manual_apply: "Manual apply", always: "Allow always", reject: "Reject" }
+                  : { once: "Allow once", always: "Allow always", reject: "Reject" }
+              }
               escapeKey="reject"
               fullscreen
               onSelect={(option) => {
+                if (option === "manual_apply") {
+                  void openManualApply(props.request, renderer)
+                    .then((completed) => {
+                      if (!completed) {
+                        toast.show({ message: "Manual apply editor exited without success", variant: "error" })
+                        return sdk.client.permission.reply({
+                          reply: "reject",
+                          requestID: props.request.id,
+                          workspace: project.workspace.current(),
+                        })
+                      }
+                      return sdk.client.permission.reply({
+                        reply: "manual_apply",
+                        requestID: props.request.id,
+                        workspace: project.workspace.current(),
+                      })
+                    })
+                    .catch((error) => {
+                      toast.show({
+                        message: error instanceof Error ? error.message : String(error),
+                        variant: "error",
+                      })
+                      void sdk.client.permission.reply({
+                        reply: "reject",
+                        requestID: props.request.id,
+                        workspace: project.workspace.current(),
+                      })
+                    })
+                  return
+                }
                 if (option === "always") {
                   setStore("stage", "always")
                   return
@@ -524,21 +563,21 @@ function RejectPrompt(props: { onConfirm: (message: string) => void; onCancel: (
   )
 }
 
-function Prompt<const T extends Record<string, string>>(props: {
+function Prompt(props: {
   title: string
   header?: JSX.Element
   body: JSX.Element
-  options: T
-  escapeKey?: keyof T
+  options: Record<string, string>
+  escapeKey?: string
   fullscreen?: boolean
-  onSelect: (option: keyof T) => void
+  onSelect: (option: string) => void
 }) {
   const { theme } = useTheme()
   const tuiConfig = useTuiConfig()
   const dimensions = useTerminalDimensions()
-  const keys = Object.keys(props.options) as (keyof T)[]
+  const keys = Object.keys(props.options)
   const [store, setStore] = createStore({
-    selected: keys[0],
+    selected: keys[0] ?? "",
     expanded: false,
   })
   const narrow = createMemo(() => dimensions().width < 80)

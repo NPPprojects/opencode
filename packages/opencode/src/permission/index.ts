@@ -54,7 +54,9 @@ export class Request extends Schema.Class<Request>("PermissionRequest")({
   static readonly zod = zod(this)
 }
 
-export const Reply = Schema.Literals(["once", "always", "reject"]).pipe(withStatics((s) => ({ zod: zod(s) })))
+export const Reply = Schema.Literals(["once", "always", "reject", "manual_apply"]).pipe(
+  withStatics((s) => ({ zod: zod(s) })),
+)
 export type Reply = Schema.Schema.Type<typeof Reply>
 
 const reply = {
@@ -128,14 +130,14 @@ export const ReplyInput = Schema.Struct({
 export type ReplyInput = Schema.Schema.Type<typeof ReplyInput>
 
 export interface Interface {
-  readonly ask: (input: AskInput) => Effect.Effect<void, Error>
+  readonly ask: (input: AskInput) => Effect.Effect<Reply, Error>
   readonly reply: (input: ReplyInput) => Effect.Effect<void>
   readonly list: () => Effect.Effect<ReadonlyArray<Request>>
 }
 
 interface PendingEntry {
   info: Request
-  deferred: Deferred.Deferred<void, RejectedError | CorrectedError>
+  deferred: Deferred.Deferred<Reply, RejectedError | CorrectedError>
 }
 
 interface State {
@@ -193,7 +195,7 @@ export const layer = Layer.effect(
         needsAsk = true
       }
 
-      if (!needsAsk) return
+      if (!needsAsk) return "always"
 
       const id = request.id ?? PermissionID.ascending()
       const info = Schema.decodeUnknownSync(Request)({
@@ -202,7 +204,7 @@ export const layer = Layer.effect(
       })
       log.info("asking", { id, permission: info.permission, patterns: info.patterns })
 
-      const deferred = yield* Deferred.make<void, RejectedError | CorrectedError>()
+      const deferred = yield* Deferred.make<Reply, RejectedError | CorrectedError>()
       pending.set(id, { info, deferred })
       yield* bus.publish(Event.Asked, info)
       return yield* Effect.ensuring(
@@ -217,15 +219,16 @@ export const layer = Layer.effect(
       const { approved, pending } = yield* InstanceState.get(state)
       const existing = pending.get(input.requestID)
       if (!existing) return
+      const response = input.reply === "manual_apply" && existing.info.permission !== "edit" ? "reject" : input.reply
 
       pending.delete(input.requestID)
       yield* bus.publish(Event.Replied, {
         sessionID: existing.info.sessionID,
         requestID: existing.info.id,
-        reply: input.reply,
+        reply: response,
       })
 
-      if (input.reply === "reject") {
+      if (response === "reject") {
         yield* Deferred.fail(
           existing.deferred,
           input.message ? new CorrectedError({ feedback: input.message }) : new RejectedError(),
@@ -244,8 +247,8 @@ export const layer = Layer.effect(
         return
       }
 
-      yield* Deferred.succeed(existing.deferred, undefined)
-      if (input.reply === "once") return
+      yield* Deferred.succeed(existing.deferred, response)
+      if (response === "once" || response === "manual_apply") return
 
       for (const pattern of existing.info.always) {
         approved.push({
@@ -267,7 +270,7 @@ export const layer = Layer.effect(
           requestID: item.info.id,
           reply: "always",
         })
-        yield* Deferred.succeed(item.deferred, undefined)
+        yield* Deferred.succeed(item.deferred, "always")
       }
     })
 

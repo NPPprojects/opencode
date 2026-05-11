@@ -17,7 +17,7 @@ export type ToolContext = {
   worktree: string
   abort: AbortSignal
   metadata(input: { title?: string; metadata?: { [key: string]: any } }): void
-  ask(input: AskInput): Effect.Effect<void>
+  ask(input: AskInput): Effect.Effect<"once" | "always" | "reject" | "manual_apply" | void>
 }
 
 type AskInput = {
