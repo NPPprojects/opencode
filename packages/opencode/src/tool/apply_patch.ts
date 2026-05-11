@@ -290,10 +290,7 @@ export const ApplyPatchTool = Tool.define(
       }
       const diagnostics = yield* lsp.diagnostics()
 
-<<<<<<< HEAD
       // Generate output summary
-=======
->>>>>>> 595bf4b79 (Smaller Merge Fixes)
       let output = `Success. Updated the following files:\n${summaryLines.join("\n")}`
 
       for (const change of fileChanges) {
