@@ -198,8 +198,13 @@ export const ApplyPatchTool = Tool.define(
       }))
 
       // Check permissions if needed
-      const relativePaths = fileChanges.map((c) => path.relative(instance.worktree, c.filePath).replaceAll("\\", "/"))
+<<<<<<< HEAD
+      const relativePaths = fileChanges.map((c) => path.relative(Instance.worktree, c.filePath).replaceAll("\\", "/"))
       const reply = yield* ctx.ask({
+=======
+      const relativePaths = fileChanges.map((c) => path.relative(instance.worktree, c.filePath).replaceAll("\\", "/"))
+      yield* ctx.ask({
+>>>>>>> origin/dev
         permission: "edit",
         patterns: relativePaths,
         always: ["*"],
@@ -212,13 +217,13 @@ export const ApplyPatchTool = Tool.define(
 
       const summaryLines = fileChanges.map((change) => {
         if (change.type === "add") {
-          return `A ${path.relative(instance.worktree, change.filePath).replaceAll("\\", "/")}`
+          return `A ${path.relative(Instance.worktree, change.filePath).replaceAll("\\", "/")}`
         }
         if (change.type === "delete") {
-          return `D ${path.relative(instance.worktree, change.filePath).replaceAll("\\", "/")}`
+          return `D ${path.relative(Instance.worktree, change.filePath).replaceAll("\\", "/")}`
         }
         const target = change.movePath ?? change.filePath
-        return `M ${path.relative(instance.worktree, target).replaceAll("\\", "/")}`
+        return `M ${path.relative(Instance.worktree, target).replaceAll("\\", "/")}`
       })
 
       if (reply === "manual_apply") {
@@ -290,10 +295,20 @@ export const ApplyPatchTool = Tool.define(
       }
       const diagnostics = yield* lsp.diagnostics()
 
-<<<<<<< HEAD
       // Generate output summary
+<<<<<<< HEAD
 =======
->>>>>>> 595bf4b79 (Smaller Merge Fixes)
+      const summaryLines = fileChanges.map((change) => {
+        if (change.type === "add") {
+          return `A ${path.relative(instance.worktree, change.filePath).replaceAll("\\", "/")}`
+        }
+        if (change.type === "delete") {
+          return `D ${path.relative(instance.worktree, change.filePath).replaceAll("\\", "/")}`
+        }
+        const target = change.movePath ?? change.filePath
+        return `M ${path.relative(instance.worktree, target).replaceAll("\\", "/")}`
+      })
+>>>>>>> origin/dev
       let output = `Success. Updated the following files:\n${summaryLines.join("\n")}`
 
       for (const change of fileChanges) {
